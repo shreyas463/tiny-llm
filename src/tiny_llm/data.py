@@ -25,21 +25,48 @@ TINYSTORIES_FALLBACK_ZIP = (
 )
 
 
-def _download_file(url: str, dest: Path, chunk_size: int = 1 << 20) -> Path:
+def _download_file(
+    url: str,
+    dest: Path,
+    chunk_size: int = 1 << 20,
+    max_bytes: int | None = None,
+) -> Path:
+    """Download ``url`` to ``dest``.
+
+    If ``max_bytes`` is set, stop after that many bytes (enough for capped
+    char budgets without pulling multi-GB TinyStories train dumps).
+    """
     ensure_dir(dest.parent)
     if dest.exists() and dest.stat().st_size > 0:
-        logger.info("Using cached download: %s", dest)
-        return dest
+        if max_bytes is None or dest.stat().st_size >= max_bytes:
+            logger.info("Using cached download: %s (%d bytes)", dest, dest.stat().st_size)
+            return dest
 
-    logger.info("Downloading %s -> %s", url, dest)
+    logger.info(
+        "Downloading %s -> %s%s",
+        url,
+        dest,
+        f" (cap {max_bytes} bytes)" if max_bytes else "",
+    )
     with requests.get(url, stream=True, timeout=120) as resp:
         resp.raise_for_status()
         tmp = dest.with_suffix(dest.suffix + ".part")
+        written = 0
         with tmp.open("wb") as f:
             for chunk in resp.iter_content(chunk_size=chunk_size):
-                if chunk:
-                    f.write(chunk)
+                if not chunk:
+                    continue
+                if max_bytes is not None:
+                    remain = max_bytes - written
+                    if remain <= 0:
+                        break
+                    chunk = chunk[:remain]
+                f.write(chunk)
+                written += len(chunk)
+                if max_bytes is not None and written >= max_bytes:
+                    break
         tmp.replace(dest)
+    logger.info("Downloaded %d bytes -> %s", dest.stat().st_size, dest)
     return dest
 
 
@@ -87,16 +114,20 @@ def prepare_tinystories(cfg: dict[str, Any]) -> dict[str, Path]:
     if url is None:
         raise ValueError(f"Unknown source_split={source_split!r}; expected one of {list(TINYSTORIES_URLS)}")
 
-    raw_path = raw_dir / f"tinystories_{source_split}.txt"
-    try:
-        _download_file(url, raw_path)
-    except requests.RequestException as exc:
-        logger.warning("Primary download failed (%s); trying synthetic fallback corpus.", exc)
-        raw_path = _write_synthetic_corpus(raw_dir / "tinystories_synthetic.txt")
-
     # For smoke: one small file → carve train/val. For full: train file + separate val download.
     max_train = int(data_cfg.get("max_train_chars") or 0) or None
     max_val = int(data_cfg.get("max_val_chars") or 0) or None
+    # Cap raw download bytes so CPU/agent runs need not pull multi-GB dumps.
+    download_cap = None
+    if max_train:
+        download_cap = max(max_train * 2, (max_val or 0) * 2, 1 << 20)
+
+    raw_path = raw_dir / f"tinystories_{source_split}.txt"
+    try:
+        _download_file(url, raw_path, max_bytes=download_cap if source_split == "train" else None)
+    except requests.RequestException as exc:
+        logger.warning("Primary download failed (%s); trying synthetic fallback corpus.", exc)
+        raw_path = _write_synthetic_corpus(raw_dir / "tinystories_synthetic.txt")
 
     if source_split == "validation" or data_cfg.get("carve_from_single_file", source_split != "train"):
         text = _read_text_capped(raw_path, None)
