@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import io
 import logging
-import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -53,17 +51,26 @@ def _read_text_capped(path: Path, max_chars: int | None) -> str:
         return f.read(max_chars)
 
 
-def _split_stories(text: str) -> list[str]:
+def split_stories(text: str) -> list[str]:
     """Split TinyStories into individual stories.
 
     TinyStoriesV2 uses ``<|endoftext|>`` as a document boundary; fall back to
-    blank-line splits for plain text corpora.
+    blank-line splits for plain text corpora. Always strips the delimiter so
+    downstream tokenization can emit BOS/EOS per story instead of encoding it.
     """
     if "<|endoftext|>" in text:
         parts = text.split("<|endoftext|>")
     else:
         parts = text.split("\n\n")
     return [p.strip() for p in parts if p.strip()]
+
+
+def normalize_stories_text(text: str) -> str:
+    """Rewrite corpus text with blank-line story separators (no endoftext markers)."""
+    stories = split_stories(text)
+    if not stories:
+        return text.strip()
+    return "\n\n".join(stories)
 
 
 def prepare_tinystories(cfg: dict[str, Any]) -> dict[str, Path]:
@@ -93,9 +100,9 @@ def prepare_tinystories(cfg: dict[str, Any]) -> dict[str, Path]:
 
     if source_split == "validation" or data_cfg.get("carve_from_single_file", source_split != "train"):
         text = _read_text_capped(raw_path, None)
-        stories = _split_stories(text)
+        stories = split_stories(text)
         if len(stories) < 2:
-            # Flat text without blank-line separators — split by character budget.
+            # Flat text without separators — split by character budget.
             total_budget = (max_train or len(text)) + (max_val or 0)
             text = text[:total_budget] if total_budget else text
             cut = max_train or int(0.9 * len(text))
@@ -112,12 +119,14 @@ def prepare_tinystories(cfg: dict[str, Any]) -> dict[str, Path]:
             if max_val:
                 val_text = val_text[:max_val]
     else:
-        train_text = _read_text_capped(raw_path, max_train)
+        # Full train dump + separate val dump — normalize <|endoftext|> → story splits
+        # so tokenization emits BOS/EOS the same way as the smoke carve path.
+        train_text = normalize_stories_text(_read_text_capped(raw_path, max_train))
         val_url = TINYSTORIES_URLS["validation"]
         val_raw = raw_dir / "tinystories_validation.txt"
         try:
             _download_file(val_url, val_raw)
-            val_text = _read_text_capped(val_raw, max_val)
+            val_text = normalize_stories_text(_read_text_capped(val_raw, max_val))
         except requests.RequestException:
             logger.warning("Val download failed; carving 5%% from train text.")
             cut = int(0.95 * len(train_text))
@@ -130,6 +139,12 @@ def prepare_tinystories(cfg: dict[str, Any]) -> dict[str, Path]:
     val_path = processed_dir / data_cfg.get("val_file", "val.txt")
     train_path.write_text(train_text, encoding="utf-8")
     val_path.write_text(val_text, encoding="utf-8")
+
+    # Drop stale token caches whenever processed text is rewritten.
+    for stale in processed_dir.glob("*_ids.npy"):
+        companion = Path(str(stale)[: -len(".npy")] + ".meta.json")
+        stale.unlink(missing_ok=True)
+        companion.unlink(missing_ok=True)
 
     logger.info(
         "Wrote train=%s (%d chars), val=%s (%d chars)",
