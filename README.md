@@ -4,12 +4,38 @@ A tiny **GPT-style language model trained from scratch** on [TinyStories](https:
 
 No product UI. Pure ML train → eval → writeup — the interview artifact for “I can train an LM end-to-end.”
 
+## Headline results (tiny-cpu)
+
+Trained the full **tiny** architecture on a **4-core CPU (no GPU)** with `configs/tiny-cpu.yaml`:
+
+| | |
+| --- | --- |
+| **Parameters** | **13.8M** |
+| Architecture | 6 layers · 384 d_model · 6 heads · context 256 · vocab 8,000 |
+| Data | ~49M train chars / ~1M val chars (TinyStoriesV2-GPT4, capped) |
+| Schedule | 5,000 steps · AdamW · lr 3e-4 · warmup 200 · cosine decay |
+| Batch | micro-batch 8 × grad-accum 4 (**effective 32**, matches `tiny.yaml`) |
+| **Best val perplexity** | **≈ 13.4** |
+| Held-out eval ppl | ≈ 14.2 |
+| Wall clock | ≈ **58 minutes** on 4× CPU, float32 |
+
+Loss curve:
+
+![tiny-cpu loss curve](artifacts/demo/loss_curve.png)
+
+### Sample (temperature 0.8)
+
+> Once upon a time, in a small town, there was a little girl named Lily. She lived in a small house with her mom. Lily loved to play outside with her toys and seek. One day, Lily's mom asked her, "Mom, can I play with me?"  
+> Lily said, "Yes, but I need to play today." Her mom smiled and said, "We can play together." Lily was very happy and played with her toys with her toys. They had lots of fun, and Lily was happy.
+
+More samples: [`artifacts/demo/samples.md`](artifacts/demo/samples.md). Prose is coherent TinyStories-style English with remaining grammar/consistency glitches — expected at ~14 ppl / 13.8M / 5k steps; a longer GPU `tiny.yaml` run should tighten this further.
+
 ## What you get
 
 | Piece | Details |
 | --- | --- |
 | Data | TinyStoriesV2-GPT4 (public HF dump), capped train/val text |
-| Tokenizer | Byte-level BPE (`tokenizers`), vocab configurable (1k smoke / 8k default) |
+| Tokenizer | Byte-level BPE (`tokenizers`), vocab 1k smoke / **8k tiny** |
 | Model | Decoder-only transformer (causal attn + MLP), weight-tied LM head |
 | Train | AdamW, cosine LR w/ warmup, grad clip, checkpoints, JSONL loss log |
 | Eval | Held-out cross-entropy → **perplexity**, generation script, loss curve plot |
@@ -22,31 +48,24 @@ token + position embed
   → LayerNorm → tied LM head
 ```
 
-Config-driven sizes (`configs/*.yaml`):
-
-| Config | Params (approx) | Layers | d_model | Heads | Context | Vocab | Target |
+| Config | Params | Layers | d_model | Heads | Context | Vocab | Target |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `smoke.yaml` | **~0.17M** | 2 | 64 | 2 | 64 | 1,024 | CPU CI / laptop smoke |
-| `tiny.yaml` | **~10–15M** | 6 | 384 | 6 | 256 | 8,000 | Consumer GPU / Colab |
+| `smoke.yaml` | ~0.17M | 2 | 64 | 2 | 64 | 1,024 | Pipeline / CI smoke |
+| **`tiny-cpu.yaml`** | **~13.8M** | **6** | **384** | **6** | **256** | **8,000** | **Serious CPU run (this README)** |
+| `tiny.yaml` | ~13.8M | 6 | 384 | 6 | 256 | 8,000 | Same model on GPU (bf16, larger micro-batch) |
 
-## Smoke results (CPU, this repo)
+`tiny-cpu.yaml` and `tiny.yaml` share the **same model**; CPU uses float32 + micro-batch 8 × accum 4 to keep an effective batch of 32 without a GPU.
 
-Reproduced with `configs/smoke.yaml` (50 steps, ~200k train chars):
+### Hyperparameters (tiny / tiny-cpu)
 
-| Metric | Value |
+| Knob | Value |
 | --- | --- |
-| Device | CPU |
-| Parameters | 168,576 |
-| Steps | 50 |
-| Val loss | ~6.56 |
-| Val perplexity | ~706 |
-| Wall time | ~1s |
-
-Loss curve:
-
-![smoke loss curve](artifacts/demo/loss_curve.png)
-
-Generation after 50 smoke steps is still gibberish (expected — undertrained tiny model). Qualitative samples after a real `tiny.yaml` GPU run belong in `artifacts/demo/samples.md`.
+| Optimizer | AdamW (β₁=0.9, β₂=0.95), weight decay 0.1 |
+| Learning rate | 3×10⁻⁴ with 200-step linear warmup + cosine to 10% |
+| Grad clip | 1.0 |
+| Dropout | 0.1 |
+| Bias in Linear | off |
+| Weight tying | embedding ↔ LM head |
 
 ## Reproduce
 
@@ -54,18 +73,17 @@ Generation after 50 smoke steps is still gibberish (expected — undertrained ti
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e .
 
-# CPU smoke (end-to-end in under a minute)
-python3 -m tiny_llm.cli prepare   --config configs/smoke.yaml
-python3 -m tiny_llm.cli tokenizer --config configs/smoke.yaml
-python3 -m tiny_llm.cli train     --config configs/smoke.yaml
-python3 -m tiny_llm.cli eval      --config configs/smoke.yaml
-python3 -m tiny_llm.cli generate  --config configs/smoke.yaml
+# Serious CPU run (same model as tiny.yaml; ~1 hour on 4 cores)
+python3 -m tiny_llm.cli prepare   --config configs/tiny-cpu.yaml
+python3 -m tiny_llm.cli tokenizer --config configs/tiny-cpu.yaml
+python3 -m tiny_llm.cli train     --config configs/tiny-cpu.yaml
+python3 -m tiny_llm.cli eval      --config configs/tiny-cpu.yaml
+python3 -m tiny_llm.cli generate  --config configs/tiny-cpu.yaml
 ```
 
-### GPU training (recommended for real metrics)
+### GPU (optional, faster)
 
 ```bash
-# Needs a CUDA GPU; uses configs/tiny.yaml (~10–15M params, 5k steps)
 python3 -m tiny_llm.cli prepare   --config configs/tiny.yaml
 python3 -m tiny_llm.cli tokenizer --config configs/tiny.yaml
 python3 -m tiny_llm.cli train     --config configs/tiny.yaml
@@ -73,38 +91,39 @@ python3 -m tiny_llm.cli eval      --config configs/tiny.yaml
 python3 -m tiny_llm.cli generate  --config configs/tiny.yaml --prompt "Once upon a time"
 ```
 
+### Smoke (pipeline only)
+
+```bash
+python3 -m tiny_llm.cli prepare   --config configs/smoke.yaml
+python3 -m tiny_llm.cli tokenizer --config configs/smoke.yaml
+python3 -m tiny_llm.cli train     --config configs/smoke.yaml
+python3 -m tiny_llm.cli eval      --config configs/smoke.yaml
+python3 -m tiny_llm.cli generate  --config configs/smoke.yaml
+```
+
 Tips:
 
-- Raise `data.max_train_chars` / `train.max_steps` in `tiny.yaml` for a longer run.
-- Checkpoints land in `checkpoints/` (gitignored). Small demo plots/metrics live under `artifacts/demo/`.
-- `device: auto` picks CUDA when available; override with `device: cpu` or `cuda`.
+- Checkpoints land in `checkpoints/` (gitignored, ~158MB for tiny-cpu). Plots/metrics/samples live under `artifacts/demo/`.
+- Token ID caches fingerprint source text + tokenizer so smoke → tiny never reuses stale IDs.
+- Raise `train.max_steps` / `data.max_train_chars` for a longer run.
 
 ## Layout
 
 ```
-configs/               smoke (CPU) + tiny (GPU) YAML
-src/tiny_llm/
-  data.py              TinyStories download + train/val prep
-  tokenizer.py         BPE train / encode / decode
-  model.py             GPT decoder-only transformer
-  dataset.py           token cache + random batch loader
-  train.py             training loop + checkpoints
-  evaluate.py          val perplexity
-  generate.py          sampling
-  plot.py              loss curves
-  cli.py               prepare | tokenizer | train | eval | generate
+configs/               smoke · tiny-cpu · tiny
+src/tiny_llm/          data, tokenizer, model, train, eval, generate, CLI
 artifacts/
-  tokenizer/           committed smoke tokenizer
-  demo/                loss curve, eval metrics, sample dump
-tests/                 unit smoke tests (no network)
+  tokenizer/           committed 8k BPE from the tiny-cpu run
+  demo/                loss curve, metrics, samples
+tests/                 unit tests (no network / no GPU)
 ```
 
 ## Interview talking points
 
-1. **Tokenizer from scratch** — not `tiktoken` / HF AutoTokenizer; trained BPE on the corpus.
+1. **Tokenizer from scratch** — trained byte-level BPE on the corpus (not `tiktoken`).
 2. **Model from scratch** — causal self-attention, residuals, LayerNorm, weight tying; size is a YAML knob.
 3. **Train hygiene** — seed control, warmup + cosine LR, grad clip, best/last checkpoints, logged curves.
-4. **Honest metrics** — report held-out perplexity + samples; smoke numbers are for pipeline proof, GPU `tiny` for quality.
+4. **Honest metrics** — held-out perplexity **≈13.4** + readable samples on CPU; GPU `tiny.yaml` for faster iteration / longer schedules.
 5. **Reproducibility** — one config file drives data caps, vocab, architecture, and train schedule.
 
 ## License
