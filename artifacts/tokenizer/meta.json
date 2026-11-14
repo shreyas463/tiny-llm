@@ -1,0 +1,10 @@
+{
+  "vocab_size": 1024,
+  "special_tokens": {
+    "pad": 0,
+    "unk": 1,
+    "bos": 2,
+    "eos": 3
+  },
+  "train_file": "data/processed/train.txt"
+}

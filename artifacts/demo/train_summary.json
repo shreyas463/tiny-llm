@@ -1,0 +1,11 @@
+{
+  "steps": 50,
+  "best_val_loss": 6.5812476634979244,
+  "best_val_ppl": 721.4388809212844,
+  "params": 168576,
+  "device": "cpu",
+  "elapsed_sec": 0.6675567626953125,
+  "checkpoint": "checkpoints/smoke/best.pt",
+  "loss_log": "runs/smoke/loss.jsonl",
+  "plot": "artifacts/demo/loss_curve.png"
+}

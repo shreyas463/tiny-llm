@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from tokenizers import Tokenizer
+from tokenizers.decoders import ByteLevel as ByteLevelDecoder
 from tokenizers.models import BPE
 from tokenizers.pre_tokenizers import ByteLevel
 from tokenizers.processors import TemplateProcessing
@@ -33,6 +34,7 @@ def train_bpe_tokenizer(
 
     tokenizer = Tokenizer(BPE(unk_token=UNK))
     tokenizer.pre_tokenizer = ByteLevel(add_prefix_space=False)
+    tokenizer.decoder = ByteLevelDecoder()
     trainer = BpeTrainer(
         vocab_size=vocab_size,
         min_frequency=min_frequency,

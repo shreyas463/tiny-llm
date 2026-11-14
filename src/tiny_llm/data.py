@@ -54,9 +54,16 @@ def _read_text_capped(path: Path, max_chars: int | None) -> str:
 
 
 def _split_stories(text: str) -> list[str]:
-    """Split TinyStories on blank lines into individual stories."""
-    parts = [p.strip() for p in text.split("\n\n")]
-    return [p for p in parts if p]
+    """Split TinyStories into individual stories.
+
+    TinyStoriesV2 uses ``<|endoftext|>`` as a document boundary; fall back to
+    blank-line splits for plain text corpora.
+    """
+    if "<|endoftext|>" in text:
+        parts = text.split("<|endoftext|>")
+    else:
+        parts = text.split("\n\n")
+    return [p.strip() for p in parts if p.strip()]
 
 
 def prepare_tinystories(cfg: dict[str, Any]) -> dict[str, Path]:

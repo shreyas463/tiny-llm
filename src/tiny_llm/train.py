@@ -130,7 +130,9 @@ def train_from_config(cfg: dict[str, Any] | None = None, config_path: str | Path
     base_lr = float(train_cfg["learning_rate"])
 
     use_autocast = device.type == "cuda" and amp_dtype in (torch.float16, torch.bfloat16)
-    scaler = torch.cuda.amp.GradScaler(enabled=(use_autocast and amp_dtype == torch.float16))
+    scaler = torch.amp.GradScaler(
+        "cuda", enabled=(use_autocast and amp_dtype == torch.float16)
+    )
 
     best_val = float("inf")
     history: list[dict[str, Any]] = []

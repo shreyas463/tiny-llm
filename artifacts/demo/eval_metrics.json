@@ -1,0 +1,9 @@
+{
+  "checkpoint": "checkpoints/smoke/best.pt",
+  "step": 49,
+  "val_loss": 6.5824438571929935,
+  "val_perplexity": 722.302377913886,
+  "eval_iters": 10,
+  "device": "cpu",
+  "params": 168576
+}

@@ -1,0 +1,20 @@
+{
+  "checkpoint": "checkpoints/smoke/best.pt",
+  "prompt": "Once upon a time",
+  "temperature": 0.8,
+  "top_k": 40,
+  "samples": [
+    {
+      "prompt": "Once upon a time",
+      "completion": "Once upon a time on s my help.. but He Tim re I the it she named the They d it Tim,es on day They day bird re at saw arelyes w theo saw He at day myo help saw\n it\n so bird she Tim she I I w park. \" ands on \" They They"
+    },
+    {
+      "prompt": "Once upon a time",
+      "completion": "Once upon a time the was w my to on ws w my They at They. my.s re saw bird on she He the ono \" the the but and are sawing to but,ing felt a rans,ly felto was the. He They at I saw had \" Heeso s so day atly"
+    },
+    {
+      "prompt": "Once upon a time",
+      "completion": "Once upon a time \" a. \"ingoing. \".. saw was. big He, bird bird bird a the and named so \" I went and d and day\n bird They and the. he They, the, oning, d was wes toes bird buts I so was are they big\n the the"
+    }
+  ]
+}
