@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+
+# Data (large corpora)
+data/raw/
+data/processed/
+*.bin
+*.npy
+*.npz
+
+# Training outputs (keep small demo artifacts under artifacts/demo/)
+checkpoints/
+runs/
+wandb/
+*.pt
+*.pth
+!artifacts/demo/**
+
+# Tokenizer training scratch (committed vocab lives under artifacts/tokenizer/)
+tmp/
+*.model
+*.vocab
+
+# Jupyter
+.ipynb_checkpoints/
