@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,58 @@ TINYSTORIES_FALLBACK_ZIP = (
 )
 
 
+def _download_meta_path(dest: Path) -> Path:
+    """Sidecar recording whether ``dest`` is a full EOF download or a byte-cap prefix."""
+    return Path(str(dest) + ".download.json")
+
+
+def _write_download_meta(
+    dest: Path,
+    *,
+    url: str,
+    nbytes: int,
+    max_bytes: int | None,
+    complete: bool,
+) -> None:
+    meta = {
+        "url": url,
+        "bytes": nbytes,
+        "max_bytes": max_bytes,
+        "complete": complete,
+    }
+    _download_meta_path(dest).write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
+
+def _read_download_meta(dest: Path) -> dict[str, Any] | None:
+    path = _download_meta_path(dest)
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _cached_download_usable(dest: Path, max_bytes: int | None) -> bool:
+    """Return True if ``dest`` can satisfy this request without re-downloading.
+
+    Capped prefixes must not satisfy later uncapped (full-corpus) requests.
+    """
+    if not dest.exists() or dest.stat().st_size <= 0:
+        return False
+    meta = _read_download_meta(dest)
+    size = dest.stat().st_size
+    if meta is not None and bool(meta.get("complete")):
+        # Full EOF download always usable (capped read happens later in prepare).
+        return True
+    if max_bytes is None:
+        # Need the complete source; incomplete/legacy caches are not enough.
+        return False
+    # Capped request: reuse if we already have at least max_bytes on disk.
+    return size >= max_bytes
+
+
 def _download_file(
     url: str,
     dest: Path,
@@ -35,12 +88,21 @@ def _download_file(
 
     If ``max_bytes`` is set, stop after that many bytes (enough for capped
     char budgets without pulling multi-GB TinyStories train dumps).
+
+    A ``.download.json`` sidecar records whether the response body was fully
+    consumed (``complete: true``). Uncapped callers never reuse a capped
+    prefix as if it were the full dump.
     """
     ensure_dir(dest.parent)
-    if dest.exists() and dest.stat().st_size > 0:
-        if max_bytes is None or dest.stat().st_size >= max_bytes:
-            logger.info("Using cached download: %s (%d bytes)", dest, dest.stat().st_size)
-            return dest
+    if _cached_download_usable(dest, max_bytes):
+        logger.info("Using cached download: %s (%d bytes)", dest, dest.stat().st_size)
+        return dest
+
+    if dest.exists() and max_bytes is None:
+        logger.info(
+            "Cached download at %s is incomplete or unmarked; re-fetching full file",
+            dest,
+        )
 
     logger.info(
         "Downloading %s -> %s%s",
@@ -52,6 +114,7 @@ def _download_file(
         resp.raise_for_status()
         tmp = dest.with_suffix(dest.suffix + ".part")
         written = 0
+        hit_byte_cap = False
         with tmp.open("wb") as f:
             for chunk in resp.iter_content(chunk_size=chunk_size):
                 if not chunk:
@@ -59,14 +122,34 @@ def _download_file(
                 if max_bytes is not None:
                     remain = max_bytes - written
                     if remain <= 0:
+                        hit_byte_cap = True
                         break
-                    chunk = chunk[:remain]
-                f.write(chunk)
-                written += len(chunk)
-                if max_bytes is not None and written >= max_bytes:
-                    break
+                    if len(chunk) > remain:
+                        chunk = chunk[:remain]
+                        hit_byte_cap = True
+                    f.write(chunk)
+                    written += len(chunk)
+                    if hit_byte_cap or written >= max_bytes:
+                        hit_byte_cap = True
+                        break
+                else:
+                    f.write(chunk)
+                    written += len(chunk)
         tmp.replace(dest)
-    logger.info("Downloaded %d bytes -> %s", dest.stat().st_size, dest)
+    complete = not hit_byte_cap
+    _write_download_meta(
+        dest,
+        url=url,
+        nbytes=dest.stat().st_size,
+        max_bytes=max_bytes,
+        complete=complete,
+    )
+    logger.info(
+        "Downloaded %d bytes -> %s (complete=%s)",
+        dest.stat().st_size,
+        dest,
+        complete,
+    )
     return dest
 
 
