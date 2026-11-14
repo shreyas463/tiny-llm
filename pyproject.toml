@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tiny-llm"
+version = "0.1.0"
+description = "Tiny GPT-style language model trained from scratch on TinyStories"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Shreyas Chaudhary" }]
+dependencies = [
+  "torch>=2.1.0",
+  "numpy>=1.24",
+  "pyyaml>=6.0",
+  "tqdm>=4.66",
+  "matplotlib>=3.8",
+  "tokenizers>=0.15",
+  "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4"]
+
+[project.scripts]
+tiny-llm-prepare = "tiny_llm.cli:prepare_data"
+tiny-llm-tokenizer = "tiny_llm.cli:train_tokenizer"
+tiny-llm-train = "tiny_llm.cli:train"
+tiny-llm-eval = "tiny_llm.cli:evaluate"
+tiny-llm-generate = "tiny_llm.cli:generate"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+tiny_llm = ["py.typed"]

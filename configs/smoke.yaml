@@ -1,0 +1,50 @@
+# CPU smoke config — tiny model, tiny data subset, few steps.
+# Goal: prove the full pipeline runs end-to-end without a GPU.
+
+seed: 42
+device: auto  # cuda if available else cpu
+
+data:
+  dataset: tinystories
+  raw_dir: data/raw
+  processed_dir: data/processed
+  # Download only the validation split for smoke (small) and carve train/val from it.
+  source_split: validation
+  max_train_chars: 200000
+  max_val_chars: 40000
+  train_file: train.txt
+  val_file: val.txt
+
+tokenizer:
+  vocab_size: 1024
+  min_frequency: 2
+  special_tokens: ["<pad>", "<unk>", "<bos>", "<eos>"]
+  artifact_dir: artifacts/tokenizer
+
+model:
+  n_layer: 2
+  n_head: 2
+  n_embd: 64
+  block_size: 64
+  dropout: 0.0
+  bias: false
+
+train:
+  batch_size: 8
+  gradient_accumulation_steps: 1
+  learning_rate: 3.0e-4
+  weight_decay: 0.1
+  warmup_steps: 20
+  max_steps: 50
+  eval_interval: 25
+  eval_iters: 10
+  log_interval: 10
+  checkpoint_dir: checkpoints/smoke
+  run_dir: runs/smoke
+  dtype: float32
+
+generate:
+  max_new_tokens: 64
+  temperature: 0.8
+  top_k: 40
+  prompt: "Once upon a time"

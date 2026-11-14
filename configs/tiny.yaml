@@ -1,0 +1,50 @@
+# Default GPU-oriented config (~10–20M params depending on vocab).
+# Use on a consumer GPU / Colab; fall back to smoke.yaml for CPU.
+
+seed: 42
+device: auto
+
+data:
+  dataset: tinystories
+  raw_dir: data/raw
+  processed_dir: data/processed
+  source_split: train
+  # Cap chars so a single consumer GPU run stays tractable; raise for a longer train.
+  max_train_chars: 50000000
+  max_val_chars: 1000000
+  train_file: train.txt
+  val_file: val.txt
+
+tokenizer:
+  vocab_size: 8000
+  min_frequency: 2
+  special_tokens: ["<pad>", "<unk>", "<bos>", "<eos>"]
+  artifact_dir: artifacts/tokenizer
+
+model:
+  n_layer: 6
+  n_head: 6
+  n_embd: 384
+  block_size: 256
+  dropout: 0.1
+  bias: false
+
+train:
+  batch_size: 32
+  gradient_accumulation_steps: 2
+  learning_rate: 3.0e-4
+  weight_decay: 0.1
+  warmup_steps: 200
+  max_steps: 5000
+  eval_interval: 250
+  eval_iters: 50
+  log_interval: 50
+  checkpoint_dir: checkpoints/tiny
+  run_dir: runs/tiny
+  dtype: bfloat16  # falls back to float32 if unsupported
+
+generate:
+  max_new_tokens: 128
+  temperature: 0.8
+  top_k: 40
+  prompt: "Once upon a time"
