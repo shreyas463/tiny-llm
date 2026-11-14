@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -68,6 +69,11 @@ def train_from_config(cfg: dict[str, Any] | None = None, config_path: str | Path
 
     set_seed(int(cfg.get("seed", 42)))
     device = resolve_device(str(cfg.get("device", "auto")))
+    if device.type == "cpu":
+        # Use all available cores for matmuls on CPU-only runs.
+        n_threads = int(os.environ.get("OMP_NUM_THREADS") or os.cpu_count() or 4)
+        torch.set_num_threads(max(1, n_threads))
+        logger.info("CPU training with torch.set_num_threads(%d)", n_threads)
     train_cfg = cfg["train"]
     data_cfg = cfg["data"]
     tok_cfg = cfg["tokenizer"]
