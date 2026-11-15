@@ -1,13 +1,15 @@
 {
-  "steps": 5000,
-  "best_val_loss": 2.5943664848804473,
-  "best_val_ppl": 13.388103108498989,
+  "steps": 18000,
+  "start_step": 0,
+  "best_val_loss": 1.8854754149913788,
+  "best_val_ppl": 6.58948643809529,
   "params": 13797120,
   "device": "cpu",
-  "elapsed_sec": 3471.7134153842926,
-  "checkpoint": "checkpoints/tiny-cpu/best.pt",
-  "loss_log": "runs/tiny-cpu/loss.jsonl",
+  "elapsed_sec": 26524.7302172184,
+  "checkpoint": "checkpoints/tiny-cpu-long/best.pt",
+  "loss_log": "runs/tiny-cpu-long/loss.jsonl",
   "plot": "artifacts/demo/loss_curve.png",
+  "min_lr_ratio": 0.05,
   "hardware": {
     "gpus": 0,
     "device": "cpu",
@@ -15,23 +17,28 @@
     "platform": "Linux-6.12.113+-x86_64-with-glibc2.39",
     "processor": "x86_64"
   },
-  "config": "configs/tiny-cpu.yaml",
+  "config": "configs/tiny-cpu-long.yaml",
   "architecture": {
     "n_layer": 6,
     "n_head": 6,
     "n_embd": 384,
     "block_size": 256,
     "vocab_size": 8000,
-    "dropout": 0.1,
+    "dropout": 0.05,
     "batch_size": 8,
     "grad_accum": 4,
     "effective_batch": 32,
-    "max_steps": 5000,
+    "max_steps": 18000,
     "lr": 0.0003,
-    "warmup_steps": 200,
-    "train_chars": 49182407,
-    "val_chars": 983424
+    "warmup_steps": 500,
+    "min_lr_ratio": 0.05,
+    "train_chars": 98364011,
+    "val_chars": 1966894
   },
-  "eval_val_loss": 2.653507423400879,
-  "eval_val_perplexity": 14.203770015239739
+  "eval_val_loss": 1.936296471953392,
+  "eval_val_perplexity": 6.933026705919172,
+  "baseline_comparison": {
+    "tiny-cpu_5k_best_ppl": 13.4,
+    "tiny-cpu-long_18k_best_ppl": 6.58948643809529
+  }
 }
