@@ -1,8 +1,7 @@
 # Capacity jump vs tiny-cpu-long (13.8M / ppl≈6.59).
-# Real recipe change: 8L/512d/8H, context 384, vocab 12k (~32M params),
-# more TinyStories text, slightly lower peak LR for larger model.
-# No GPU in this environment — float32 CPU path; document wall-clock honestly.
-# Target: ~2.5–4h on 4-core CPU at ~0.7s/step × 15k steps.
+# Real recipe change: 8L/512d/8H (~31.5M params), vocab 12k, more TinyStories text.
+# Context 256 on CPU for throughput (GPU twin configs/medium.yaml uses ctx 384).
+# No GPU here — float32; ~0.4–0.8s/step → ~2–4h for 15k steps on 4 cores.
 
 seed: 42
 device: cpu
@@ -27,20 +26,20 @@ model:
   n_layer: 8
   n_head: 8
   n_embd: 512
-  block_size: 384
+  block_size: 256
   dropout: 0.05
   bias: false
 
 train:
-  batch_size: 4
-  gradient_accumulation_steps: 4   # effective batch 16 × 384 tokens
-  learning_rate: 2.5e-4            # slightly lower than tiny for larger net
+  batch_size: 8
+  gradient_accumulation_steps: 2   # effective batch 16
+  learning_rate: 2.5e-4
   min_lr_ratio: 0.05
   weight_decay: 0.1
   warmup_steps: 600
   max_steps: 15000
   eval_interval: 500
-  eval_iters: 40
+  eval_iters: 30
   log_interval: 50
   save_every: 1000
   checkpoint_dir: checkpoints/medium-cpu
