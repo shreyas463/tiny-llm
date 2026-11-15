@@ -37,7 +37,8 @@ train:
   min_lr_ratio: 0.05
   weight_decay: 0.1
   warmup_steps: 600
-  max_steps: 15000
+  # Larger net needs more tokens than tiny-cpu-long to beat ~6.59 ppl; 25k × 4 × 256 ≈ 25.6M tokens.
+  max_steps: 25000
   eval_interval: 500
   eval_iters: 30
   log_interval: 50
