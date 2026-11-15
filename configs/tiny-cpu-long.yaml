@@ -1,0 +1,52 @@
+# Stronger CPU run vs configs/tiny-cpu.yaml (5k / ~13.4 ppl).
+# Same 13.8M architecture; more TinyStories text, longer schedule, milder
+# dropout, longer warmup, deeper cosine floor. Expect ~2.5–3.5h on 4-core CPU.
+
+seed: 42
+device: cpu
+
+data:
+  dataset: tinystories
+  raw_dir: data/raw
+  processed_dir: data/processed
+  source_split: train
+  max_train_chars: 100000000   # 2× prior CPU run
+  max_val_chars: 2000000
+  train_file: train.txt
+  val_file: val.txt
+
+tokenizer:
+  vocab_size: 8000
+  min_frequency: 2
+  special_tokens: ["<pad>", "<unk>", "<bos>", "<eos>"]
+  artifact_dir: artifacts/tokenizer
+
+model:
+  n_layer: 6
+  n_head: 6
+  n_embd: 384
+  block_size: 256
+  dropout: 0.05               # less dropout for longer train
+  bias: false
+
+train:
+  batch_size: 8
+  gradient_accumulation_steps: 4   # effective batch 32
+  learning_rate: 3.0e-4
+  min_lr_ratio: 0.05               # cosine floor at 5% of peak LR
+  weight_decay: 0.1
+  warmup_steps: 500
+  max_steps: 18000
+  eval_interval: 500
+  eval_iters: 40
+  log_interval: 50
+  save_every: 1000
+  checkpoint_dir: checkpoints/tiny-cpu-long
+  run_dir: runs/tiny-cpu-long
+  dtype: float32
+
+generate:
+  max_new_tokens: 180
+  temperature: 0.8
+  top_k: 40
+  prompt: "Once upon a time"

@@ -56,11 +56,18 @@ def train_tokenizer(argv: list[str] | None = None) -> None:
 def train(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Train tiny GPT")
     _add_config_arg(parser)
+    parser.add_argument(
+        "--resume",
+        nargs="?",
+        const=True,
+        default=None,
+        help="Resume from checkpoints/.../last.pt (or pass an explicit path)",
+    )
     args = parser.parse_args(argv)
     _setup_logging(args.verbose)
     from tiny_llm.train import train_from_config
 
-    summary = train_from_config(config_path=args.config)
+    summary = train_from_config(config_path=args.config, resume=args.resume)
     print(
         f"Done. best_val_ppl={summary['best_val_ppl']:.2f} "
         f"checkpoint={summary['checkpoint']}"

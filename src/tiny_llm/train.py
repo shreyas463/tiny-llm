@@ -28,14 +28,22 @@ from tiny_llm.util import (
 logger = logging.getLogger(__name__)
 
 
-def _lr_at_step(step: int, warmup: int, max_steps: int, lr: float) -> float:
+def _lr_at_step(
+    step: int,
+    warmup: int,
+    max_steps: int,
+    lr: float,
+    min_lr_ratio: float = 0.1,
+) -> float:
+    """Linear warmup then cosine decay down to ``min_lr_ratio * lr``."""
+    min_lr = lr * min_lr_ratio
     if step < warmup:
         return lr * (step + 1) / max(1, warmup)
     if step >= max_steps:
-        return lr * 0.1
+        return min_lr
     progress = (step - warmup) / max(1, max_steps - warmup)
     coeff = 0.5 * (1.0 + math.cos(math.pi * progress))
-    return lr * (0.1 + 0.9 * coeff)
+    return min_lr + coeff * (lr - min_lr)
 
 
 @torch.no_grad()
@@ -61,7 +69,11 @@ def estimate_loss(
     return out
 
 
-def train_from_config(cfg: dict[str, Any] | None = None, config_path: str | Path | None = None) -> dict[str, Any]:
+def train_from_config(
+    cfg: dict[str, Any] | None = None,
+    config_path: str | Path | None = None,
+    resume: str | Path | bool | None = None,
+) -> dict[str, Any]:
     if cfg is None:
         if config_path is None:
             raise ValueError("Provide cfg or config_path")
@@ -124,8 +136,6 @@ def train_from_config(cfg: dict[str, Any] | None = None, config_path: str | Path
     run_dir = ensure_dir(train_cfg["run_dir"])
     ckpt_dir = ensure_dir(train_cfg["checkpoint_dir"])
     log_path = run_dir / "loss.jsonl"
-    if log_path.exists():
-        log_path.unlink()
 
     max_steps = int(train_cfg["max_steps"])
     warmup = int(train_cfg.get("warmup_steps", 0))
@@ -134,21 +144,73 @@ def train_from_config(cfg: dict[str, Any] | None = None, config_path: str | Path
     eval_iters = int(train_cfg.get("eval_iters", 20))
     log_interval = int(train_cfg.get("log_interval", 10))
     base_lr = float(train_cfg["learning_rate"])
+    min_lr_ratio = float(train_cfg.get("min_lr_ratio", 0.1))
+    # Periodic last.pt so a multi-hour CPU run can resume after interruption.
+    save_every = int(train_cfg.get("save_every", max(eval_interval, 500)))
 
     use_autocast = device.type == "cuda" and amp_dtype in (torch.float16, torch.bfloat16)
     scaler = torch.amp.GradScaler(
         "cuda", enabled=(use_autocast and amp_dtype == torch.float16)
     )
 
+    start_step = 0
     best_val = float("inf")
+    resume_path: Path | None = None
+    if resume is True:
+        candidate = ckpt_dir / "last.pt"
+        resume_path = candidate if candidate.exists() else None
+    elif resume:
+        resume_path = Path(resume)
+
+    if resume_path is not None and resume_path.exists():
+        from tiny_llm.util import load_checkpoint
+
+        model, ckpt = load_checkpoint(resume_path, device)
+        if "optimizer" in ckpt:
+            try:
+                optimizer.load_state_dict(ckpt["optimizer"])
+            except (ValueError, RuntimeError) as exc:
+                logger.warning("Could not restore optimizer state (%s); continuing with fresh AdamW", exc)
+        start_step = int(ckpt.get("step", -1)) + 1
+        if ckpt.get("best_val_loss") is not None:
+            best_val = float(ckpt["best_val_loss"])
+        logger.info(
+            "Resumed from %s at step %d (best_val=%.4f)",
+            resume_path,
+            start_step,
+            best_val,
+        )
+    elif log_path.exists():
+        log_path.unlink()
+
     history: list[dict[str, Any]] = []
     model.train()
     t0 = time.time()
     optimizer.zero_grad(set_to_none=True)
 
-    pbar = tqdm(range(max_steps), desc="train", disable=max_steps < 5)
+    if start_step >= max_steps:
+        logger.info("Already at/beyond max_steps=%d; nothing to train", max_steps)
+        return {
+            "steps": max_steps,
+            "best_val_loss": best_val,
+            "best_val_ppl": math.exp(min(best_val, 20)) if best_val < float("inf") else None,
+            "params": n_params,
+            "device": str(device),
+            "elapsed_sec": 0.0,
+            "checkpoint": str(ckpt_dir / "best.pt"),
+            "loss_log": str(log_path),
+            "resumed": True,
+        }
+
+    pbar = tqdm(
+        range(start_step, max_steps),
+        desc="train",
+        disable=max_steps < 5,
+        initial=start_step,
+        total=max_steps,
+    )
     for step in pbar:
-        lr = _lr_at_step(step, warmup, max_steps, base_lr)
+        lr = _lr_at_step(step, warmup, max_steps, base_lr, min_lr_ratio=min_lr_ratio)
         for pg in optimizer.param_groups:
             pg["lr"] = lr
 
@@ -210,6 +272,16 @@ def train_from_config(cfg: dict[str, Any] | None = None, config_path: str | Path
                     best_val_loss=best_val,
                 )
 
+        if save_every > 0 and (step + 1) % save_every == 0:
+            save_checkpoint(
+                ckpt_dir / "last.pt",
+                model,
+                optimizer,
+                step,
+                cfg,
+                best_val_loss=best_val if best_val < float("inf") else None,
+            )
+
     save_checkpoint(
         ckpt_dir / "last.pt",
         model,
@@ -225,6 +297,7 @@ def train_from_config(cfg: dict[str, Any] | None = None, config_path: str | Path
     elapsed = time.time() - t0
     summary = {
         "steps": max_steps,
+        "start_step": start_step,
         "best_val_loss": best_val,
         "best_val_ppl": math.exp(min(best_val, 20)),
         "params": n_params,
@@ -233,6 +306,7 @@ def train_from_config(cfg: dict[str, Any] | None = None, config_path: str | Path
         "checkpoint": str(ckpt_dir / "best.pt"),
         "loss_log": str(log_path),
         "plot": str(plot_path),
+        "min_lr_ratio": min_lr_ratio,
     }
     (run_dir / "summary.json").write_text(
         __import__("json").dumps(summary, indent=2), encoding="utf-8"
