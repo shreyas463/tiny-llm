@@ -174,6 +174,15 @@ def train_from_config(
         start_step = int(ckpt.get("step", -1)) + 1
         if ckpt.get("best_val_loss") is not None:
             best_val = float(ckpt["best_val_loss"])
+        # Prefer the dedicated best.pt metric if it is better than last.pt's snapshot.
+        best_path = ckpt_dir / "best.pt"
+        if best_path.exists() and best_path.resolve() != resume_path.resolve():
+            try:
+                best_ckpt = torch.load(best_path, map_location="cpu", weights_only=False)
+                if best_ckpt.get("best_val_loss") is not None:
+                    best_val = min(best_val, float(best_ckpt["best_val_loss"]))
+            except (OSError, RuntimeError, ValueError) as exc:
+                logger.warning("Could not read best.pt for resume metric (%s)", exc)
         logger.info(
             "Resumed from %s at step %d (best_val=%.4f)",
             resume_path,
