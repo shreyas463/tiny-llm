@@ -1,0 +1,51 @@
+# GPU-oriented medium recipe (~32M params). Same architecture as medium-cpu.yaml.
+# Prefer this on CUDA / Colab; use medium-cpu.yaml when only CPU is available.
+
+seed: 42
+device: auto
+
+data:
+  dataset: tinystories
+  raw_dir: data/raw
+  processed_dir: data/processed
+  source_split: train
+  max_train_chars: 150000000
+  max_val_chars: 2500000
+  train_file: train.txt
+  val_file: val.txt
+
+tokenizer:
+  vocab_size: 12000
+  min_frequency: 2
+  special_tokens: ["<pad>", "<unk>", "<bos>", "<eos>"]
+  artifact_dir: artifacts/tokenizer
+
+model:
+  n_layer: 8
+  n_head: 8
+  n_embd: 512
+  block_size: 384
+  dropout: 0.05
+  bias: false
+
+train:
+  batch_size: 16
+  gradient_accumulation_steps: 2   # effective batch 32
+  learning_rate: 2.5e-4
+  min_lr_ratio: 0.05
+  weight_decay: 0.1
+  warmup_steps: 600
+  max_steps: 15000
+  eval_interval: 500
+  eval_iters: 50
+  log_interval: 50
+  save_every: 1000
+  checkpoint_dir: checkpoints/medium
+  run_dir: runs/medium
+  dtype: bfloat16
+
+generate:
+  max_new_tokens: 200
+  temperature: 0.8
+  top_k: 40
+  prompt: "Once upon a time"
