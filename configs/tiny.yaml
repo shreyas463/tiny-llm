@@ -1,5 +1,6 @@
 # Default GPU-oriented config (~10–20M params depending on vocab).
-# Use on a consumer GPU / Colab; fall back to smoke.yaml for CPU.
+# Use on a consumer GPU / Colab. For CPU-only machines use configs/tiny-cpu.yaml
+# (same model; smaller micro-batch + float32).
 
 seed: 42
 device: auto

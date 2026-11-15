@@ -1,9 +1,9 @@
 {
-  "checkpoint": "checkpoints/smoke/best.pt",
-  "step": 49,
-  "val_loss": 6.5824438571929935,
-  "val_perplexity": 722.302377913886,
-  "eval_iters": 10,
+  "checkpoint": "checkpoints/tiny-cpu/best.pt",
+  "step": 4750,
+  "val_loss": 2.653507423400879,
+  "val_perplexity": 14.203770015239739,
+  "eval_iters": 40,
   "device": "cpu",
-  "params": 168576
+  "params": 13797120
 }
