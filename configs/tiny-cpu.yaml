@@ -1,7 +1,5 @@
-# Serious CPU run of the *same* model as configs/tiny.yaml (6L / 384d / 8k vocab).
-# No GPU available in this environment — float32, micro-batch 8 × accum 4
-# (effective batch 32, matching tiny.yaml). 50M train chars, 5000 steps.
-# Expect ~45–75 min wall-clock on a 4-core CPU; document actuals in README.
+# Baseline CPU run of the tiny.yaml model (6L / 384d / 8k). ~5k steps / ~13.4 ppl.
+# For a stronger CPU schedule see configs/tiny-cpu-long.yaml (more data + steps).
 
 seed: 42
 device: cpu

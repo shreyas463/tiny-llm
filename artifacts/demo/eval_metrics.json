@@ -1,8 +1,8 @@
 {
-  "checkpoint": "checkpoints/tiny-cpu/best.pt",
-  "step": 4750,
-  "val_loss": 2.653507423400879,
-  "val_perplexity": 14.203770015239739,
+  "checkpoint": "checkpoints/tiny-cpu-long/best.pt",
+  "step": 17999,
+  "val_loss": 1.936296471953392,
+  "val_perplexity": 6.933026705919172,
   "eval_iters": 40,
   "device": "cpu",
   "params": 13797120
