@@ -1,5 +1,5 @@
 {
-  "vocab_size": 8000,
+  "vocab_size": 12000,
   "special_tokens": {
     "pad": 0,
     "unk": 1,
