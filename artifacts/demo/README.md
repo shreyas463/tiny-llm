@@ -1,6 +1,6 @@
 # Demo artifacts
 
-Results from **`configs/tiny-cpu-long.yaml`** (stronger CPU run):
+**Headline (best metrics):** `configs/tiny-cpu-long.yaml` — 13.8M / **val ppl ≈ 6.59**
 
 | File | Meaning |
 | --- | --- |
@@ -9,7 +9,6 @@ Results from **`configs/tiny-cpu-long.yaml`** (stronger CPU run):
 | `eval_metrics.json` | Held-out loss + perplexity |
 | `train_summary.json` | Params, hardware, hyperparams, wall time |
 | `samples.json` / `samples.md` | Generation dump |
+| `medium/` | Capacity-jump experiment (~31.5M); best ppl ≈ 10.16 — did **not** beat 6.59 on CPU |
 
-**Hardware:** 4-core CPU, no GPU · **wall clock:** ~7.4 h · **best val ppl:** ≈ 6.59 (vs ≈ 13.4 at 5k steps)
-
-Checkpoints (`checkpoints/tiny-cpu-long/*.pt`) are gitignored.
+Checkpoints under `checkpoints/` are gitignored.

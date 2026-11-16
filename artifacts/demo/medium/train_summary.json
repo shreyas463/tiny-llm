@@ -1,0 +1,41 @@
+{
+  "steps": 25000,
+  "start_step": 7000,
+  "best_val_loss": 2.318281062444051,
+  "best_val_ppl": 10.158197982009582,
+  "params": 31458304,
+  "device": "cpu",
+  "elapsed_sec": 30405.868409872055,
+  "checkpoint": "checkpoints/medium-cpu/best.pt",
+  "loss_log": "runs/medium-cpu/loss.jsonl",
+  "plot": "artifacts/demo/loss_curve.png",
+  "min_lr_ratio": 0.05,
+  "hardware": {
+    "gpus": 0,
+    "device": "cpu",
+    "cpu_count": 4,
+    "platform": "Linux-6.12.113+-x86_64-with-glibc2.39"
+  },
+  "config": "configs/medium-cpu.yaml",
+  "architecture": {
+    "n_layer": 8,
+    "n_head": 8,
+    "n_embd": 512,
+    "block_size": 256,
+    "vocab_size": 12000,
+    "dropout": 0.05,
+    "params": 31458304,
+    "batch_size": 4,
+    "grad_accum": 4,
+    "max_steps": 25000,
+    "lr": 0.00025,
+    "warmup_steps": 600,
+    "min_lr_ratio": 0.05,
+    "train_chars": 147546860
+  },
+  "eval_val_loss": 2.421833697954814,
+  "eval_val_perplexity": 11.266499742479075,
+  "beats_tiny_cpu_long_baseline": false,
+  "tiny_cpu_long_best_ppl": 6.59,
+  "conclusion": "Capacity jump on CPU did not beat tiny-cpu-long (~6.59). Medium needs GPU throughput for more tokens/step."
+}

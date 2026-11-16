@@ -50,6 +50,8 @@ token + position embed
 | `tiny-cpu.yaml` | 13.8M | 6 / 384 / 6 | 256 | 8k | Baseline CPU (~13.4 ppl) |
 | **`tiny-cpu-long.yaml`** | **13.8M** | **6 / 384 / 6** | **256** | **8k** | **Best CPU result (~6.59 ppl)** |
 | `tiny.yaml` | 13.8M | 6 / 384 / 6 | 256 | 8k | Same model, GPU path |
+| `medium-cpu.yaml` | ~31.5M | 8 / 512 / 8 | 256 | 12k | Capacity jump (CPU; see below) |
+| `medium.yaml` | ~31.5M | 8 / 512 / 8 | **384** | 12k | Same capacity, **GPU** path |
 
 ### Hyperparams (`tiny-cpu-long`)
 
@@ -93,13 +95,34 @@ artifacts/
 tests/            unit tests (no GPU required)
 ```
 
+## Medium capacity experiment (honest)
+
+We tried a real architecture jump on the same 4-core CPU (no GPU available):
+
+| | **tiny-cpu-long (winner)** | medium-cpu (this experiment) |
+| --- | --- | --- |
+| Params | **13.8M** | ~31.5M (8L / 512d / 8H / V12k) |
+| Steps / train chars | 18k / ~98M | 25k / ~148M |
+| Wall clock | ~7.4 h | ~8.4 h (plus earlier segments) |
+| **Best val ppl** | **≈ 6.59** | ≈ **10.16** |
+
+**Did not beat the baseline.** The larger model is under-trained in tokens/wall-hour on CPU (smaller micro-batch). Samples still form stories but are weaker than tiny-cpu-long. Artifacts: [`artifacts/demo/medium/`](artifacts/demo/medium/).
+
+**To actually unlock the capacity jump:** run `configs/medium.yaml` on a CUDA GPU (bf16, larger batch, ctx 384).
+
+```bash
+python3 -m tiny_llm.cli prepare   --config configs/medium.yaml
+python3 -m tiny_llm.cli tokenizer --config configs/medium.yaml
+python3 -m tiny_llm.cli train     --config configs/medium.yaml
+python3 -m tiny_llm.cli eval      --config configs/medium.yaml
+python3 -m tiny_llm.cli generate  --config configs/medium.yaml
+```
+
 ## What’s next (intentional, not hope-and-rerun)
 
-Further ppl gains on this exact recipe will be marginal on CPU. Meaningful next jumps:
-
-- **GPU `tiny.yaml`** — same model, more steps / larger batch in wall-clock minutes
-- **Capacity** — e.g. 8L / 512d if you want a bigger demo model
-- **Data** — full uncapped TinyStories train dump once download/time allow
+- **GPU `medium.yaml`** — fair test of the 32M recipe (this is the real remaining quality jump)
+- **GPU `tiny.yaml`** — faster iteration on the proven 13.8M recipe
+- **Data** — uncapped TinyStories train dump when download/time allow
 
 ## License
 

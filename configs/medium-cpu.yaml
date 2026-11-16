@@ -1,0 +1,54 @@
+# Capacity jump vs tiny-cpu-long (13.8M / ppl≈6.59).
+# Real recipe change: 8L/512d/8H (~31.5M params), vocab 12k, more TinyStories text.
+# Context 256 on CPU for throughput (GPU twin configs/medium.yaml uses ctx 384).
+# No GPU here — float32; ~0.4–0.8s/step → ~2–4h for 15k steps on 4 cores.
+
+seed: 42
+device: cpu
+
+data:
+  dataset: tinystories
+  raw_dir: data/raw
+  processed_dir: data/processed
+  source_split: train
+  max_train_chars: 150000000
+  max_val_chars: 2500000
+  train_file: train.txt
+  val_file: val.txt
+
+tokenizer:
+  vocab_size: 12000
+  min_frequency: 2
+  special_tokens: ["<pad>", "<unk>", "<bos>", "<eos>"]
+  artifact_dir: artifacts/tokenizer
+
+model:
+  n_layer: 8
+  n_head: 8
+  n_embd: 512
+  block_size: 256
+  dropout: 0.05
+  bias: false
+
+train:
+  batch_size: 4
+  gradient_accumulation_steps: 4   # effective batch 16; bs=4 is faster wall-clock on CPU
+  learning_rate: 2.5e-4
+  min_lr_ratio: 0.05
+  weight_decay: 0.1
+  warmup_steps: 600
+  # Larger net needs more tokens than tiny-cpu-long to beat ~6.59 ppl; 25k × 4 × 256 ≈ 25.6M tokens.
+  max_steps: 25000
+  eval_interval: 500
+  eval_iters: 30
+  log_interval: 50
+  save_every: 1000
+  checkpoint_dir: checkpoints/medium-cpu
+  run_dir: runs/medium-cpu
+  dtype: float32
+
+generate:
+  max_new_tokens: 200
+  temperature: 0.8
+  top_k: 40
+  prompt: "Once upon a time"
